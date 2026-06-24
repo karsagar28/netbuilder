@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   createWorld,
-  nodeId,
   snapshot,
   tick,
   tickWithCommandResults,
@@ -53,9 +52,9 @@ function edgeKey(a: NodeId, b: NodeId): string {
 
 export function App() {
   const [world, setWorld] = useState(() => tick(createWorld(42, createFixture())));
-  const [selectedTenantId] = useState(ids.acme);
+  const [selectedTenantId] = useState(ids.nebulaMart);
   const [log, setLog] = useState<LogEntry[]>([
-    { kind: 'info', message: 'Fixture loaded. Acme is overloading a single primary-server path.' }
+    { kind: 'info', message: 'NebulaMart is overloading one rocket pod. Research a Smoothie Balancer to split traffic.' }
   ]);
 
   const shot = useMemo(() => snapshot(world), [world]);
@@ -90,11 +89,11 @@ export function App() {
         current,
         [
           { type: 'PlaceNode', kind: 'load_balancer', pos: { x: 270, y: 95 } },
-          { type: 'BuildLink', a: ids.border, b: ids.lb, tier: 'fast' },
-          { type: 'BuildLink', a: ids.lb, b: ids.primary, tier: 'standard' },
-          { type: 'BuildLink', a: ids.lb, b: ids.serverB, tier: 'standard' },
-          { type: 'BuildLink', a: ids.lb, b: ids.serverC, tier: 'standard' },
-          { type: 'AssignLoadBalancer', tenantId: ids.acme, nodeId: ids.lb }
+          { type: 'BuildLink', a: ids.trafficGarden, b: ids.smoothieBalancer, tier: 'fast' },
+          { type: 'BuildLink', a: ids.smoothieBalancer, b: ids.rocketA, tier: 'standard' },
+          { type: 'BuildLink', a: ids.smoothieBalancer, b: ids.rocketB, tier: 'standard' },
+          { type: 'BuildLink', a: ids.smoothieBalancer, b: ids.rocketC, tier: 'standard' },
+          { type: 'AssignLoadBalancer', tenantId: ids.nebulaMart, nodeId: ids.smoothieBalancer }
         ],
         nextLog
       )
@@ -103,7 +102,7 @@ export function App() {
 
   function reset() {
     setWorld(tick(createWorld(42, createFixture())));
-    setLog([{ kind: 'info', message: 'Reset fixture.' }]);
+    setLog([{ kind: 'info', message: 'Reset NebulaMart.' }]);
   }
 
   return (
@@ -111,7 +110,7 @@ export function App() {
       <header className="hero">
         <div>
           <p className="eyebrow">NetBuilder Phase 1 Visual Debugger</p>
-          <h1>Serve Acme before the primary path melts down.</h1>
+          <h1>Keep NebulaMart's rocket pods from melting down.</h1>
           <p>
             This is not the full MVP yet. It is the first browser-visible slice: a deterministic sim fixture,
             pressure-tinted links, flow inspection, and the load balancer mechanic.
@@ -139,9 +138,9 @@ export function App() {
             <h2>Controls</h2>
             <div className="buttons">
               <button onClick={step}>Step tick</button>
-              <button onClick={researchLb} disabled={shot.tech.loadBalancerUnlocked}>Research LB</button>
+              <button onClick={researchLb} disabled={shot.tech.loadBalancerUnlocked}>Research Smoothie Tech</button>
               <button onClick={installLb} disabled={!shot.tech.loadBalancerUnlocked || Boolean(tenant?.assignedLoadBalancer)}>
-                Install + assign LB
+                Install Smoothie Balancer
               </button>
               <button className="secondary" onClick={reset}>Reset</button>
             </div>
@@ -155,7 +154,7 @@ export function App() {
               <div><dt>Served</dt><dd>{service?.servedGbps.toFixed(1) ?? '—'} Gbps</dd></div>
               <div><dt>Pressure</dt><dd>{service?.worstPressure ?? '—'}</dd></div>
               <div><dt>Latency</dt><dd>{service?.latencyMs.toFixed(1) ?? '—'} ms</dd></div>
-              <div><dt>LB</dt><dd>{tenant?.assignedLoadBalancer ? 'assigned' : shot.tech.loadBalancerUnlocked ? 'researched' : 'locked'}</dd></div>
+              <div><dt>Balancer</dt><dd>{tenant?.assignedLoadBalancer ? 'assigned' : shot.tech.loadBalancerUnlocked ? 'researched' : 'locked'}</dd></div>
             </dl>
           </section>
 
@@ -164,7 +163,7 @@ export function App() {
             <ul className="flowList">
               {tenantFlows.map((flow, index) => (
                 <li key={`${flow.from}-${flow.to}-${index}`}>
-                  <strong>{label(flow.from, shot)} → {label(flow.to, shot)}</strong>
+                  <strong>{pathLabel(flow, shot)}</strong>
                   <span>{flow.servedGbps.toFixed(1)} Gbps · {flow.pressure}</span>
                 </li>
               ))}
@@ -233,7 +232,7 @@ function NetworkMap({ shot, flows, highlightedEdges }: { shot: WorldSnapshot; fl
       {shot.nodes.map((node) => (
         <g key={node.id} filter={node.kind === 'load_balancer' ? 'url(#glow)' : undefined}>
           <circle cx={node.pos.x} cy={node.pos.y} r={node.kind === 'server' ? 24 : 28} fill={nodeColors[node.kind]} className="node" />
-          <text x={node.pos.x} y={node.pos.y + 5} textAnchor="middle" className="nodeIcon">{icon(node.kind)}</text>
+          <text x={node.pos.x} y={node.pos.y + 8} textAnchor="middle" className="nodeIcon">{icon(node)}</text>
           <text x={node.pos.x} y={node.pos.y + 45} textAnchor="middle" className="nodeLabel">{shortLabel(node.id)}</text>
         </g>
       ))}
@@ -258,15 +257,31 @@ function StatusBadge({ compliant }: { compliant: boolean }) {
   return <span className={compliant ? 'status ok' : 'status bad'}>{compliant ? 'Customer healthy' : 'SLA breach'}</span>;
 }
 
-function icon(kind: Node['kind']): string {
-  if (kind === 'border') return '↔';
-  if (kind === 'switch') return 'S';
-  if (kind === 'load_balancer') return 'LB';
-  return '▣';
+function icon(node: Node): string {
+  if (node.kind === 'border') return '☁️';
+  if (node.kind === 'switch') return '🌿';
+  if (node.kind === 'load_balancer') return '🥤';
+  if (node.id === ids.rocketA) return '🚀';
+  if (node.id === ids.rocketB) return '🛸';
+  return '🛰️';
 }
 
+const friendlyNames = new Map<NodeId, string>([
+  [ids.cloudGate, 'Cloud Gate'],
+  [ids.trafficGarden, 'Traffic Garden'],
+  [ids.rocketA, 'Rocket Pod A'],
+  [ids.rocketB, 'UFO Pod B'],
+  [ids.rocketC, 'Satellite Pod C'],
+  [ids.smoothieBalancer, 'Smoothie Balancer']
+]);
+
 function shortLabel(id: NodeId): string {
-  return id.replace('load_balancer', 'lb').replace('server-', 'srv-');
+  return friendlyNames.get(id) ?? id;
+}
+
+function pathLabel(flow: FlowAllocation, shot: WorldSnapshot): string {
+  const path = flow.path.length > 0 ? flow.path : [flow.from, flow.to];
+  return path.map((id) => label(id, shot)).join(' → ');
 }
 
 function label(id: NodeId, shot: WorldSnapshot): string {

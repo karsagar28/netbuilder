@@ -56,7 +56,7 @@ function seed(baseGbps = 90): WorldSeed {
     balance: 1_000,
     nodes: [node(border, 'border', 0), node(sw, 'switch', 1), node(s1, 'server', 2), node(s2, 'server', 3), node(s3, 'server', 4)],
     edges: [
-      { id: edgeId('e-border-sw'), a: border, b: sw, capacityGbps: 40, baseLatencyMs: 2, status: 'ok', buildTicksLeft: 0, opexPerTick: 1 },
+      { id: edgeId('e-border-sw'), a: border, b: sw, capacityGbps: 120, baseLatencyMs: 2, status: 'ok', buildTicksLeft: 0, opexPerTick: 1 },
       { id: edgeId('e-sw-s1'), a: sw, b: s1, capacityGbps: 40, baseLatencyMs: 2, status: 'ok', buildTicksLeft: 0, opexPerTick: 1 }
     ],
     tenants: [tenant(baseGbps)]
@@ -97,7 +97,7 @@ describe('@netbuilder/sim phase 0 core', () => {
     world = tick(world, [{ type: 'ResearchTech', tech: 'load_balancer' }]);
     world = tick(world, [{ type: 'PlaceNode', kind: 'load_balancer', pos: { x: 1, y: 1 } }]);
     world = tick(world, [
-      { type: 'BuildLink', a: border, b: lb, tier: 'fast' },
+      { type: 'BuildLink', a: sw, b: lb, tier: 'fast' },
       { type: 'BuildLink', a: lb, b: s1, tier: 'standard' },
       { type: 'BuildLink', a: lb, b: s2, tier: 'standard' },
       { type: 'BuildLink', a: lb, b: s3, tier: 'standard' },
@@ -106,8 +106,10 @@ describe('@netbuilder/sim phase 0 core', () => {
     world = tick(world);
 
     const shot = snapshot(world);
+    const sourceToLb = shot.derived.flowAllocations.find((flow) => flow.to === lb);
     const flowsToServers = shot.derived.flowAllocations.filter((flow) => [s1, s2, s3].includes(flow.to));
 
+    expect(sourceToLb?.path).toEqual([border, sw, lb]);
     expect(flowsToServers).toHaveLength(3);
     expect(flowsToServers.map((flow) => flow.servedGbps)).toEqual([30, 30, 30]);
     expect(shot.derived.tenantService[0]?.compliant).toBe(true);
@@ -137,7 +139,7 @@ describe('@netbuilder/sim phase 0 core', () => {
       commands: [
         { tick: 1, command: { type: 'ResearchTech', tech: 'load_balancer' } },
         { tick: 2, command: { type: 'PlaceNode', kind: 'load_balancer', pos: { x: 1, y: 1 } } },
-        { tick: 3, command: { type: 'BuildLink', a: border, b: lb, tier: 'fast' } },
+        { tick: 3, command: { type: 'BuildLink', a: sw, b: lb, tier: 'fast' } },
         { tick: 3, command: { type: 'BuildLink', a: lb, b: s1, tier: 'standard' } },
         { tick: 3, command: { type: 'AssignLoadBalancer', tenantId: acme, nodeId: lb } }
       ]

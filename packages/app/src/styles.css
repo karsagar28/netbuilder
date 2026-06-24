@@ -30,7 +30,7 @@ button { font: inherit; }
 .link { stroke-width: 8; stroke-linecap: round; opacity: .9; transition: stroke .2s ease; }
 .link.highlighted { stroke-width: 10; filter: drop-shadow(0 0 8px currentColor); }
 .node { stroke: rgba(255,255,255,.88); stroke-width: 3; }
-.nodeIcon { fill: #07101f; font-weight: 900; font-size: 15px; }
+.nodeIcon { font-weight: 900; font-size: 22px; dominant-baseline: middle; }
 .nodeLabel, .edgeLabel { fill: #dbeafe; font-size: 12px; font-weight: 700; paint-order: stroke; stroke: #07101f; stroke-width: 4px; stroke-linejoin: round; }
 .edgeLabel { fill: #cbd5e1; font-size: 11px; }
 .flowDot { opacity: .95; filter: drop-shadow(0 0 5px currentColor); }
