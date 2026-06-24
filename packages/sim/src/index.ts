@@ -251,12 +251,14 @@ export function pressureBand(utilization: number): PressureBand {
 }
 
 export function tick(world: World, commands: Command[] = []): World {
+  return tickWithCommandResults(world, commands).world;
+}
+
+export function tickWithCommandResults(world: World, commands: Command[] = []): { world: World; results: CommandResult[] } {
   const next = cloneWorld(world);
   next.tick += 1;
 
-  for (const command of commands) {
-    applyCommand(next, command);
-  }
+  const results = commands.map((command) => applyCommand(next, command));
 
   advanceConstruction(next);
   const derived = routeFlows(next);
@@ -264,7 +266,7 @@ export function tick(world: World, commands: Command[] = []): World {
   settleEconomy(next, derived);
   updateFinancialState(next);
   next.lastDerived = derived;
-  return next;
+  return { world: next, results };
 }
 
 export function applyCommand(world: World, command: Command): CommandResult {

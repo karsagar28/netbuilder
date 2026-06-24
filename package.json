@@ -7,13 +7,17 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm --workspace @netbuilder/app run dev",
+    "build": "npm --workspace @netbuilder/app run build",
     "test": "vitest run",
-    "typecheck": "tsc -b packages/sim",
-    "check": "npm run typecheck && npm run test"
+    "typecheck": "tsc -b packages/sim packages/app",
+    "check": "npm run typecheck && npm run test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "@vitejs/plugin-react": "^5.1.2",
     "typescript": "^5.9.3",
+    "vite": "^7.3.0",
     "vitest": "^4.0.15"
   }
 }
