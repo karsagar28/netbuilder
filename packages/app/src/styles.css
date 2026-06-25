@@ -61,6 +61,7 @@ button { font: inherit; }
 .row { display: flex; align-items: center; gap: 10px; }
 .pill { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 16px; background: var(--paper); border: 3px solid var(--ink); border-radius: 13px; padding: 5px 13px; box-shadow: 0 4px 0 var(--ink); }
 .live { font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 20px; background: #ff6a5b; color: #fff; -webkit-text-stroke: 1.5px var(--ink); paint-order: stroke fill; border: 3px solid var(--ink); border-radius: 13px; padding: 4px 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 0 var(--ink); }
+.live.designBadge { background: #9a78f0; }
 .beat { width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 2px solid var(--ink); animation: beat 1.4s infinite; }
 @keyframes beat { 0%,100% { transform: scale(1); } 50% { transform: scale(.6); } }
 .timer { width: 300px; height: 18px; background: #e7d4b0; border: 3px solid var(--ink); border-radius: 99px; overflow: hidden; box-shadow: 0 4px 0 var(--ink); }
@@ -83,7 +84,8 @@ button { font: inherit; }
 .link.highlighted { stroke-width: 11; filter: drop-shadow(0 0 7px currentColor); }
 @keyframes cableFlow { to { stroke-dashoffset: -28; } }
 .node { stroke: var(--ink); stroke-width: 3.5; }
-.nodeIcon { font-size: 22px; dominant-baseline: middle; }
+.nodeIconObject { overflow: visible; pointer-events: none; }
+.cozyIcon { display: block; overflow: visible; }
 .nodeLabel, .edgeLabel { fill: #fff; font-family: 'Fredoka', sans-serif; font-size: 12px; font-weight: 700; paint-order: stroke fill; stroke: var(--ink); stroke-width: 4px; stroke-linejoin: round; }
 .edgeLabel { fill: #fff7db; font-size: 11px; }
 .flowDot { opacity: .96; filter: drop-shadow(0 0 5px currentColor); }
@@ -100,6 +102,7 @@ button { font: inherit; }
 .tool:disabled { opacity: .58; filter: saturate(.65); cursor: not-allowed; }
 .ic { width: 38px; height: 38px; border-radius: 11px; border: 2.5px solid var(--ink); display: grid; place-items: center; flex: none; font-size: 20px; }
 .ic.blue { background: #bfe8ff; }
+.ic.green { background: #c8f6d6; }
 .ic.purple { background: #e8defc; }
 .ic.orange { background: #ffe3c9; }
 .tn { display: block; font-family: 'Fredoka', sans-serif; font-size: 14px; line-height: 1; }
@@ -131,6 +134,7 @@ button { font: inherit; }
 .status { display: inline-flex; border-radius: 999px; padding: 4px 9px; font-family: 'Fredoka', sans-serif; font-size: 12px; border: 2px solid var(--ink); }
 .status.ok { color: #135329; background: #bdf4cf; }
 .status.bad { color: #7d1523; background: #ffc4cc; animation: flash 1s infinite; }
+.status.design { color: #4f3aa6; background: #efe2ff; }
 @keyframes flash { 0%,100% { opacity: 1; } 50% { opacity: .48; } }
 
 .inspector { left: 440px; right: 278px; bottom: 18px; display: grid; grid-template-columns: 1.05fr .95fr; gap: 12px; align-items: end; pointer-events: none; }

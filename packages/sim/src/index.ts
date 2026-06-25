@@ -269,6 +269,12 @@ export function tickWithCommandResults(world: World, commands: Command[] = []): 
   return { world: next, results };
 }
 
+export function applyCommandsForDesign(world: World, commands: Command[]): { world: World; results: CommandResult[] } {
+  const next = cloneWorld(world);
+  const results = commands.map((command) => applyCommand(next, command));
+  return { world: next, results };
+}
+
 export function applyCommand(world: World, command: Command): CommandResult {
   switch (command.type) {
     case 'ResearchTech': {

@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
+  applyCommandsForDesign,
   createWorld,
   snapshot,
   tick,
@@ -13,9 +14,11 @@ import {
   type World,
   type WorldSnapshot
 } from '@netbuilder/sim';
-import { createFixture, ids } from './fixture.js';
+import { CozyIcon } from './IconPack.js';
+import { createFixture, edgeIds, ids } from './fixture.js';
 
 type LogEntry = { kind: 'ok' | 'error' | 'info'; message: string };
+type Phase = 'design' | 'run';
 
 const pressureColors: Record<PressureBand, string> = {
   calm: '#46d079',
@@ -32,8 +35,8 @@ const nodeColors: Record<Node['kind'], string> = {
   server: '#46d079'
 };
 
-function runCommands(world: World, commands: Command[], log: LogEntry[]): World {
-  const result = tickWithCommandResults(world, commands);
+function runCommands(world: World, commands: Command[], log: LogEntry[], mode: Phase): World {
+  const result = mode === 'design' ? applyCommandsForDesign(world, commands) : tickWithCommandResults(world, commands);
   result.results.forEach((commandResult, index) => {
     const command = commands[index];
     if (!command) return;
@@ -50,7 +53,8 @@ function friendlyCommand(type: Command['type']): string {
   if (type === 'ResearchTech') return 'Smoothie tech researched';
   if (type === 'PlaceNode') return 'Smoothie Balancer placed';
   if (type === 'BuildLink') return 'Cable snapped in';
-  if (type === 'AssignLoadBalancer') return 'Traffic rerouted through balancer';
+  if (type === 'AssignLoadBalancer') return 'All traffic rerouted through balancer';
+  if (type === 'RemoveEdge') return 'Old direct cable packed away';
   return type;
 }
 
@@ -59,19 +63,20 @@ function edgeKey(a: NodeId, b: NodeId): string {
 }
 
 export function App() {
-  const [world, setWorld] = useState(() => tick(createWorld(42, createFixture())));
+  const [phase, setPhase] = useState<Phase>('design');
+  const [world, setWorld] = useState(() => createWorld(42, createFixture()));
   const [selectedTenantId] = useState(ids.nebulaMart);
   const [log, setLog] = useState<LogEntry[]>([
-    { kind: 'info', message: 'NebulaMart is overloading one rocket pod. Research a Smoothie Balancer to split traffic.' }
+    { kind: 'info', message: 'Design phase: place the starter pods, then wire a balancer before opening the doors.' }
   ]);
 
   const shot = useMemo(() => snapshot(world), [world]);
   const tenant = shot.tenants.find((entry) => entry.id === selectedTenantId);
   const service = shot.derived.tenantService.find((entry) => entry.tenantId === selectedTenantId);
-  const tenantFlows = shot.derived.flowAllocations.filter((flow) => flow.tenantId === selectedTenantId);
+  const tenantFlows = phase === 'run' ? shot.derived.flowAllocations.filter((flow) => flow.tenantId === selectedTenantId) : [];
   const highlightedEdges = new Set<EdgeId>(tenantFlows.flatMap((flow) => flow.edgeIds));
-  const health = service?.compliant ? 3 : shot.tech.loadBalancerUnlocked ? 2 : 1;
-  const balancerLabel = tenant?.assignedLoadBalancer ? 'BALANCED' : shot.tech.loadBalancerUnlocked ? 'READY' : 'LOCKED';
+  const health = phase === 'design' ? 3 : service?.compliant ? 3 : shot.tech.loadBalancerUnlocked ? 2 : 1;
+  const balancerLabel = phase === 'design' ? 'DESIGN' : tenant?.assignedLoadBalancer ? 'BALANCED' : shot.tech.loadBalancerUnlocked ? 'READY' : 'LOCKED';
 
   function update(mutator: (current: World, nextLog: LogEntry[]) => World) {
     setWorld((current) => {
@@ -83,6 +88,7 @@ export function App() {
   }
 
   function step() {
+    if (phase === 'design') return;
     update((current, nextLog) => {
       nextLog.push({ kind: 'info', message: 'The live round advanced one beat' });
       return tick(current);
@@ -90,7 +96,7 @@ export function App() {
   }
 
   function researchLb() {
-    update((current, nextLog) => runCommands(current, [{ type: 'ResearchTech', tech: 'load_balancer' }], nextLog));
+    update((current, nextLog) => runCommands(current, [{ type: 'ResearchTech', tech: 'load_balancer' }], nextLog, phase));
   }
 
   function installLb() {
@@ -98,6 +104,7 @@ export function App() {
       runCommands(
         current,
         [
+          { type: 'RemoveEdge', edgeId: edgeIds.gardenToRocketA },
           { type: 'PlaceNode', kind: 'load_balancer', pos: { x: 270, y: 95 } },
           { type: 'BuildLink', a: ids.trafficGarden, b: ids.smoothieBalancer, tier: 'fast' },
           { type: 'BuildLink', a: ids.smoothieBalancer, b: ids.rocketA, tier: 'standard' },
@@ -105,14 +112,22 @@ export function App() {
           { type: 'BuildLink', a: ids.smoothieBalancer, b: ids.rocketC, tier: 'standard' },
           { type: 'AssignLoadBalancer', tenantId: ids.nebulaMart, nodeId: ids.smoothieBalancer }
         ],
-        nextLog
+        nextLog,
+        phase
       )
     );
   }
 
+  function startRun() {
+    setPhase('run');
+    setWorld((current) => tick(current));
+    setLog((current) => [...current, { kind: 'info' as const, message: 'Run phase started: customers are now being served.' }].slice(-8));
+  }
+
   function reset() {
-    setWorld(tick(createWorld(42, createFixture())));
-    setLog([{ kind: 'info', message: 'Reset NebulaMart.' }]);
+    setPhase('design');
+    setWorld(createWorld(42, createFixture()));
+    setLog([{ kind: 'info', message: 'Reset to Design phase.' }]);
   }
 
   return (
@@ -127,8 +142,8 @@ export function App() {
 
       <section className="hud centerHud">
         <div className="row">
-          <span className="pill">TICK {shot.tick}</span>
-          <span className="live"><span className="beat" />LIVE!</span>
+          <span className="pill">{phase === 'design' ? 'DESIGN' : `RUN · TICK ${shot.tick}`}</span>
+          <span className={phase === 'design' ? 'live designBadge' : 'live'}><span className="beat" />{phase === 'design' ? 'PLAN!' : 'LIVE!'}</span>
         </div>
         <div className="timer"><i style={{ width: `${Math.min(92, 22 + shot.tick * 8)}%` }} /></div>
       </section>
@@ -142,7 +157,7 @@ export function App() {
       </section>
 
       <section className="sceneCard">
-        <NetworkMap shot={shot} flows={tenantFlows} highlightedEdges={highlightedEdges} />
+        <NetworkMap phase={phase} shot={shot} flows={tenantFlows} highlightedEdges={highlightedEdges} />
         <div className="legend">
           {Object.entries(pressureColors).map(([band, color]) => (
             <span key={band}><i style={{ background: color }} />{band}</span>
@@ -152,20 +167,24 @@ export function App() {
 
       <aside className="hud dock">
         <div className="dockHead chunk">BUILD<small>cozy tools</small></div>
-        <button className="tool" onClick={step}>
-          <span className="ic blue">⏭️</span>
+        <button className="tool" onClick={startRun} disabled={phase === 'run'}>
+          <span className="ic green"><CozyIcon name="tick" /></span>
+          <span><span className="tn">Start Run</span><span className="tc">serve customers</span></span>
+        </button>
+        <button className="tool" onClick={step} disabled={phase === 'design'}>
+          <span className="ic blue"><CozyIcon name="tick" /></span>
           <span><span className="tn">Step Beat</span><span className="tc">advance tick</span></span>
         </button>
         <button className="tool" onClick={researchLb} disabled={shot.tech.loadBalancerUnlocked}>
-          <span className="ic purple">📚</span>
+          <span className="ic purple"><CozyIcon name="research" /></span>
           <span><span className="tn">Smoothie Tech</span><span className="tc"><span className="miniCoin">$</span>90 research</span></span>
         </button>
         <button className="tool" onClick={installLb} disabled={!shot.tech.loadBalancerUnlocked || Boolean(tenant?.assignedLoadBalancer)}>
-          <span className="ic purple">🥤</span>
+          <span className="ic purple"><CozyIcon name="balancer" /></span>
           <span><span className="tn">Balancer</span><span className="tc"><span className="miniCoin">$</span>540 install</span></span>
         </button>
         <button className="tool" onClick={reset}>
-          <span className="ic orange">🔄</span>
+          <span className="ic orange"><CozyIcon name="reset" /></span>
           <span><span className="tn">Reset</span><span className="tc">fresh round</span></span>
         </button>
       </aside>
@@ -179,16 +198,19 @@ export function App() {
       <section className="job hud">
         <span className="ribbon">CURRENT JOB!</span>
         <div className="jt chunk">{tenant?.name ?? 'NebulaMart'} <span className="tag">CLUSTER</span></div>
-        <StatusBadge compliant={Boolean(service?.compliant)} />
+        <StatusBadge phase={phase} compliant={Boolean(service?.compliant)} />
         <div className="jd">
-          Demand {service?.demandedGbps.toFixed(1) ?? '—'} Gbps · Pressure {service?.worstPressure ?? '—'} · {service?.latencyMs.toFixed(1) ?? '—'} ms
+          {phase === 'design'
+            ? 'PlateUp-style planning time: arrange the network, add the Smoothie Balancer, then start the run.'
+            : `Demand ${service?.demandedGbps.toFixed(1) ?? '—'} Gbps · Pressure ${service?.worstPressure ?? '—'} · ${service?.latencyMs.toFixed(1) ?? '—'} ms`}
         </div>
-        <div className="jf"><span className="reward"><span className="coin chunk">$</span>{service?.servedGbps.toFixed(0) ?? 0}/tick</span></div>
+        <div className="jf"><span className="reward"><span className="coin chunk">$</span>{phase === 'design' ? 'ready' : `${service?.servedGbps.toFixed(0) ?? 0}/tick`}</span></div>
       </section>
 
       <section className="hud inspector">
         <Panel title="Flow Routes">
           <ul className="flowList">
+            {phase === 'design' && <li><strong>Design phase</strong><span>No packets move until you start the run.</span></li>}
             {tenantFlows.map((flow, index) => (
               <li key={`${flow.from}-${flow.to}-${index}`}>
                 <strong>{pathLabel(flow, shot)}</strong>
@@ -210,7 +232,7 @@ export function App() {
   );
 }
 
-function NetworkMap({ shot, flows, highlightedEdges }: { shot: WorldSnapshot; flows: FlowAllocation[]; highlightedEdges: Set<EdgeId> }) {
+function NetworkMap({ phase, shot, flows, highlightedEdges }: { phase: Phase; shot: WorldSnapshot; flows: FlowAllocation[]; highlightedEdges: Set<EdgeId> }) {
   const nodesById = new Map(shot.nodes.map((node) => [node.id, node]));
   const metricsByEdge = new Map(shot.derived.edgeMetrics.map((metric) => [metric.edgeId, metric]));
   const activeSegments = new Set(flows.flatMap((flow) => flow.edgeIds));
@@ -231,7 +253,7 @@ function NetworkMap({ shot, flows, highlightedEdges }: { shot: WorldSnapshot; fl
         const b = nodesById.get(edge.b);
         if (!a || !b) return null;
         const metric = metricsByEdge.get(edge.id);
-        const color = pressureColors[metric?.pressure ?? 'calm'];
+        const color = phase === 'design' ? '#d09a5f' : pressureColors[metric?.pressure ?? 'calm'];
         const highlighted = highlightedEdges.has(edge.id);
         return (
           <g key={edge.id}>
@@ -245,9 +267,11 @@ function NetworkMap({ shot, flows, highlightedEdges }: { shot: WorldSnapshot; fl
               className={highlighted ? 'link highlighted' : 'link'}
             />
             {activeSegments.has(edge.id) && <FlowDots a={a} b={b} color={color} />}
-            <text x={(a.pos.x + b.pos.x) / 2} y={(a.pos.y + b.pos.y) / 2 - 12} className="edgeLabel">
-              {metric?.pressure ?? 'calm'} · {metric?.loadGbps.toFixed(0) ?? 0}/{edge.capacityGbps}
-            </text>
+            {phase === 'run' && (
+              <text x={(a.pos.x + b.pos.x) / 2} y={(a.pos.y + b.pos.y) / 2 - 12} className="edgeLabel">
+                {metric?.pressure ?? 'calm'} · {metric?.loadGbps.toFixed(0) ?? 0}/{edge.capacityGbps}
+              </text>
+            )}
           </g>
         );
       })}
@@ -256,8 +280,9 @@ function NetworkMap({ shot, flows, highlightedEdges }: { shot: WorldSnapshot; fl
           <ellipse cx={node.pos.x} cy={node.pos.y + 19} rx="31" ry="13" fill="#000" opacity=".14" />
           <circle cx={node.pos.x} cy={node.pos.y} r={node.kind === 'server' ? 25 : 29} fill={nodeColors[node.kind]} className="node" />
           <circle cx={node.pos.x - 9} cy={node.pos.y - 10} r="7" fill="#fff" opacity=".32" />
-          <text x={node.pos.x} y={node.pos.y + 8} textAnchor="middle" className="nodeIcon">{icon(node)}</text>
-          <text x={node.pos.x} y={node.pos.y + 49} textAnchor="middle" className="nodeLabel">{shortLabel(node.id)}</text>
+          <foreignObject x={node.pos.x - 18} y={node.pos.y - 18} width="36" height="36" className="nodeIconObject">
+            <CozyIcon name={node.kind} size={36} />
+          </foreignObject>
         </g>
       ))}
     </svg>
@@ -277,7 +302,8 @@ function FlowDots({ a, b, color }: { a: Node; b: Node; color: string }) {
   );
 }
 
-function StatusBadge({ compliant }: { compliant: boolean }) {
+function StatusBadge({ compliant, phase }: { compliant: boolean; phase: Phase }) {
+  if (phase === 'design') return <span className="status design">Design phase</span>;
   return <span className={compliant ? 'status ok' : 'status bad'}>{compliant ? 'Customer healthy' : 'SLA breach'}</span>;
 }
 
@@ -296,15 +322,6 @@ function TenantCard({ name, sub, hearts, color, muted = false }: { name: string;
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return <section className="panel"><h2>{title}</h2>{children}</section>;
-}
-
-function icon(node: Node): string {
-  if (node.kind === 'border') return '☁️';
-  if (node.kind === 'switch') return '🌿';
-  if (node.kind === 'load_balancer') return '🥤';
-  if (node.id === ids.rocketA) return '🚀';
-  if (node.id === ids.rocketB) return '🛸';
-  return '🛰️';
 }
 
 const friendlyNames = new Map<NodeId, string>([

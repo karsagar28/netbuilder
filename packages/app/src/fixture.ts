@@ -11,6 +11,11 @@ export const ids = {
   nebulaMart: tenantId('nebulamart')
 };
 
+export const edgeIds = {
+  cloudGateToGarden: edgeId('e-cloud-gate-garden'),
+  gardenToRocketA: edgeId('e-garden-rocket-a')
+};
+
 function makeNode(id: Node['id'], kind: Node['kind'], x: number, y: number): Node {
   return {
     id,
@@ -61,8 +66,8 @@ export function createFixture(): WorldSeed {
       makeNode(ids.rocketC, 'server', 520, 330)
     ],
     edges: [
-      makeEdge(edgeId('e-cloud-gate-garden'), ids.cloudGate, ids.trafficGarden, 120),
-      makeEdge(edgeId('e-garden-rocket-a'), ids.trafficGarden, ids.rocketA, 40)
+      makeEdge(edgeIds.cloudGateToGarden, ids.cloudGate, ids.trafficGarden, 120),
+      makeEdge(edgeIds.gardenToRocketA, ids.trafficGarden, ids.rocketA, 40)
     ],
     tenants: [tenant]
   };
